@@ -4,6 +4,14 @@ import { Download, Upload, Bell, BellOff } from 'lucide-react';
 import { useStore, applyAppearance, type Snapshot } from '@/lib/store';
 import { ACCENTS, type ThemePref } from '@/lib/types';
 import { Chip, SectionTitle } from '@/components/TypeBits';
+import { peakHour } from '@/lib/adapt';
+import type { Usage } from '@/lib/types';
+
+/** Default the nudge to the hour the person already tends to show up, else 9 AM. */
+function suggestedNudge(usage: Usage): string {
+  const h = peakHour(usage) ?? 9;
+  return `${String(h).padStart(2, '0')}:00`;
+}
 
 const THEMES: { v: ThemePref; label: string }[] = [
   { v: 'system', label: 'Match phone' },
@@ -18,6 +26,7 @@ export default function You() {
   const importSnapshot = useStore((s) => s.importSnapshot);
   const resetAll = useStore((s) => s.resetAll);
   const items = useStore((s) => s.items);
+  const usage = useStore((s) => s.usage);
   const fileRef = useRef<HTMLInputElement>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -115,6 +124,24 @@ export default function You() {
         </button>
       )}
       {notifState === 'unsupported' && <p className="text-[14px] text-ink-2">This browser cannot send notifications. Due things still show on Today.</p>}
+
+      <div className="mt-5 flex items-center gap-3 flex-wrap">
+        <Chip active={!!profile.nudgeTime} onClick={() => update({ nudgeTime: profile.nudgeTime ? null : suggestedNudge(usage) })}>
+          One nudge a day
+        </Chip>
+        {profile.nudgeTime && (
+          <input
+            type="time"
+            value={profile.nudgeTime}
+            onChange={(e) => e.target.value && update({ nudgeTime: e.target.value })}
+            aria-label="Nudge time"
+            className="h-9 px-3 rounded-xl bg-paper-2/70 border border-line focus:border-ink-3 outline-none text-[14px]"
+          />
+        )}
+      </div>
+      <p className="mt-2 text-[12px] text-ink-3">
+        A single "here is today" message at the time you tend to use this. It only fires while the app is open or installed on your home screen.
+      </p>
 
       <SectionTitle>Your data</SectionTitle>
       <p className="text-[14px] text-ink-2 mb-3">

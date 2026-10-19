@@ -9,6 +9,13 @@ import { TYPE_META } from '@/lib/typeMeta';
 import { askForNotifications } from '@/lib/notify';
 
 const TYPES: ItemType[] = ['task', 'note', 'link', 'reminder'];
+const REPEATS = [
+  { label: 'never', days: 0 },
+  { label: 'daily', days: 1 },
+  { label: 'weekly', days: 7 },
+  { label: 'every 2 weeks', days: 14 },
+  { label: 'monthly', days: 30 },
+];
 
 export default function ItemPage() {
   const { id } = useParams();
@@ -18,6 +25,7 @@ export default function ItemPage() {
   const deleteItem = useStore((s) => s.deleteItem);
   const togglePin = useStore((s) => s.togglePin);
   const toggleDone = useStore((s) => s.toggleDone);
+  const setRepeat = useStore((s) => s.setRepeat);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
@@ -139,6 +147,18 @@ export default function ItemPage() {
               </button>
             </>
           )}
+        </div>
+      )}
+
+      {showDue && (
+        <div className="mt-4 flex items-center gap-2 flex-wrap">
+          <label className="text-[13px] text-ink-2">Comes back</label>
+          {REPEATS.map((r) => (
+            <Chip key={r.label} active={(item.repeatDays ?? 0) === r.days} onClick={() => setRepeat(item.id, r.days || undefined)}>
+              {r.label}
+            </Chip>
+          ))}
+          {item.repeatDays ? <span className="text-[12px] text-ink-3">counted from when you finish it</span> : null}
         </div>
       )}
 

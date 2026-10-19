@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CornerDownLeft } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { parseCapture } from '@/lib/parse';
@@ -9,21 +9,68 @@ import { Chip, TypeIcon } from './TypeBits';
 import { TYPE_META } from '@/lib/typeMeta';
 import { askForNotifications } from '@/lib/notify';
 
+/** Shown one letter at a time to new people, so the trick is obvious without a tutorial. */
+const DEMOS = [
+  'pay rent friday 3pm',
+  'buy milk',
+  'an idea I do not want to lose',
+  'remind me to call mom tomorrow 9am',
+  'that article someone sent me https://…',
+];
+
+const reducedMotion = () => typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function useTypewriter(on: boolean): string {
+  const [text, setText] = useState(() => (reducedMotion() ? DEMOS[0] : ''));
+  useEffect(() => {
+    if (!on || reducedMotion()) return;
+    let demo = 0;
+    let pos = 0;
+    let timer = 0;
+    const step = () => {
+      const full = DEMOS[demo];
+      if (pos <= full.length) {
+        setText(full.slice(0, pos));
+        pos += 1;
+        timer = window.setTimeout(step, 45);
+      } else {
+        timer = window.setTimeout(() => {
+          demo = (demo + 1) % DEMOS.length;
+          pos = 0;
+          step();
+        }, 1800);
+      }
+    };
+    step();
+    return () => window.clearTimeout(timer);
+  }, [on]);
+  return text;
+}
+
+interface Props {
+  autoFocus?: boolean;
+  /** Pre-filled text, e.g. from the phone share sheet. */
+  initial?: string;
+  onSaved?: () => void;
+}
+
 /**
  * The one box. Type anything; the app guesses whether it is a task, note, link or reminder.
  * No decision has to be made before writing. The guess can be changed with a tap.
  */
-export default function Capture({ autoFocus = false, onSaved }: { autoFocus?: boolean; onSaved?: () => void }) {
-  const [text, setText] = useState('');
+export default function Capture({ autoFocus = false, initial, onSaved }: Props) {
+  const [text, setText] = useState(initial ?? '');
   const [override, setOverride] = useState<ItemType | null>(null);
   const [justSaved, setJustSaved] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const addItem = useStore((s) => s.addItem);
   const usage = useStore((s) => s.usage);
+  const count = useStore((s) => s.items.length);
 
   const parsed = useMemo(() => (text.trim() ? parseCapture(text) : null), [text]);
   const type: ItemType = override ?? parsed?.type ?? 'note';
   const types = useMemo(() => orderedTypes(usage), [usage]);
+  const demo = useTypewriter(count < 3 && !text);
 
   const grow = () => {
     const el = ref.current;
@@ -31,6 +78,11 @@ export default function Capture({ autoFocus = false, onSaved }: { autoFocus?: bo
     el.style.height = '0px';
     el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
   };
+
+  // Shared-in text arrives as initial state (the parent remounts us with a new key); just size the box.
+  useEffect(() => {
+    if (initial) requestAnimationFrame(grow);
+  }, [initial]);
 
   const submit = () => {
     if (!parsed) return;
@@ -51,7 +103,7 @@ export default function Capture({ autoFocus = false, onSaved }: { autoFocus?: bo
         autoFocus={autoFocus}
         value={text}
         rows={1}
-        placeholder="What's on your mind?"
+        placeholder={count < 3 ? demo || ' ' : "What's on your mind?"}
         aria-label="Drop something here"
         onChange={(e) => {
           setText(e.target.value);
@@ -89,7 +141,7 @@ export default function Capture({ autoFocus = false, onSaved }: { autoFocus?: bo
           </>
         ) : (
           <span className="text-[12px] text-ink-3 px-1 fade-in">
-            {justSaved ?? 'A task, a thought, a link, or "remind me friday 3pm". It sorts itself.'}
+            {justSaved ?? (count < 3 ? 'Type anything. It works out what it is.' : 'A task, a thought, a link, or "remind me friday 3pm". It sorts itself.')}
           </span>
         )}
       </div>

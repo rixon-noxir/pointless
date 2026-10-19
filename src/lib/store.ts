@@ -27,6 +27,10 @@ interface State {
   usage: Usage;
   /** Reminder ids already announced, so they only fire once. */
   notified: string[];
+  /** Local date (YYYY-MM-DD) of the last daily nudge. */
+  lastNudgedOn: string | null;
+  /** Repeat suggestions the person said no to, by normalised title. */
+  dismissedRepeats: string[];
 
   setProfile: (patch: Partial<Profile>) => void;
   addItem: (n: NewItem) => Item;
@@ -39,6 +43,9 @@ interface State {
   clearDone: () => void;
   tuckStale: () => number;
   markNotified: (id: string) => void;
+  setLastNudgedOn: (d: string) => void;
+  setRepeat: (id: string, days: number | undefined) => void;
+  dismissRepeat: (key: string) => void;
 
   setScratchText: (text: string) => void;
   addStroke: (s: Stroke) => void;
@@ -61,6 +68,7 @@ const defaultProfile = (): Profile => ({
   accent: '#e8a0bf',
   theme: 'system',
   onboarded: false,
+  nudgeTime: null,
 });
 
 const nowIso = () => new Date().toISOString();
@@ -78,6 +86,8 @@ export const useStore = create<State>()(
       scratch: { text: '', strokes: [] },
       usage: emptyUsage(),
       notified: [],
+      lastNudgedOn: null,
+      dismissedRepeats: [],
 
       setProfile: (patch) => set((s) => ({ profile: { ...s.profile, ...patch } })),
 
@@ -117,9 +127,39 @@ export const useStore = create<State>()(
       deleteItem: (id) => set((s) => ({ items: s.items.filter((i) => i.id !== id) })),
 
       toggleDone: (id) =>
-        set((s) => ({
-          items: s.items.map((i) => (i.id === id ? { ...i, done: !i.done, updatedAt: nowIso() } : i)),
-        })),
+        set((s) => {
+          const t = nowIso();
+          const target = s.items.find((i) => i.id === id);
+          if (!target) return {};
+          const nowDone = !target.done;
+          const items = s.items.map((i) =>
+            i.id === id ? { ...i, done: nowDone, doneAt: nowDone ? t : i.doneAt, updatedAt: t } : i,
+          );
+          // Flexible rhythm: finishing a repeating item queues the next one, due N days from now.
+          if (nowDone && target.repeatDays && target.repeatDays > 0) {
+            const due = new Date();
+            due.setDate(due.getDate() + target.repeatDays);
+            if (target.due) {
+              const prev = new Date(target.due);
+              due.setHours(prev.getHours(), prev.getMinutes(), 0, 0);
+            } else {
+              due.setHours(9, 0, 0, 0);
+            }
+            items.unshift({
+              ...target,
+              id: newId(),
+              done: false,
+              doneAt: undefined,
+              due: due.toISOString(),
+              createdAt: t,
+              updatedAt: t,
+              lastOpenedAt: undefined,
+              openCount: 0,
+              tucked: false,
+            });
+          }
+          return { items };
+        }),
 
       togglePin: (id) =>
         set((s) => ({
@@ -148,6 +188,11 @@ export const useStore = create<State>()(
       },
 
       markNotified: (id) => set((s) => ({ notified: s.notified.includes(id) ? s.notified : [...s.notified, id] })),
+      setLastNudgedOn: (d) => set({ lastNudgedOn: d }),
+      setRepeat: (id, days) =>
+        set((s) => ({ items: s.items.map((i) => (i.id === id ? { ...i, repeatDays: days, updatedAt: nowIso() } : i)) })),
+      dismissRepeat: (key) =>
+        set((s) => ({ dismissedRepeats: s.dismissedRepeats.includes(key) ? s.dismissedRepeats : [...s.dismissedRepeats, key] })),
 
       setScratchText: (text) => set((s) => ({ scratch: { ...s.scratch, text } })),
       addStroke: (stroke) => set((s) => ({ scratch: { ...s.scratch, strokes: [...s.scratch.strokes, stroke] } })),
@@ -166,12 +211,30 @@ export const useStore = create<State>()(
           scratch: snap.scratch ?? { text: '', strokes: [] },
           usage: snap.usage ?? emptyUsage(),
           notified: [],
+          lastNudgedOn: null,
+          dismissedRepeats: [],
         }),
 
       resetAll: () =>
-        set({ profile: defaultProfile(), items: [], scratch: { text: '', strokes: [] }, usage: emptyUsage(), notified: [] }),
+        set({
+          profile: defaultProfile(),
+          items: [],
+          scratch: { text: '', strokes: [] },
+          usage: emptyUsage(),
+          notified: [],
+          lastNudgedOn: null,
+          dismissedRepeats: [],
+        }),
     }),
-    { name: 'pointless', version: 1 },
+    {
+      name: 'pointless',
+      version: 1,
+      // Fill in fields added after a person first saved their data.
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<State>;
+        return { ...current, ...p, profile: { ...current.profile, ...(p.profile ?? {}) } };
+      },
+    },
   ),
 );
 

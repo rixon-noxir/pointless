@@ -9,6 +9,10 @@ export interface Item {
   /** ISO timestamp. Reminders always have one; tasks may. */
   due?: string;
   done: boolean;
+  /** When it was last marked done. */
+  doneAt?: string;
+  /** Flexible rhythm: a fresh copy is due this many days after it is finished. */
+  repeatDays?: number;
   pinned: boolean;
   tags: string[];
   createdAt: string;
@@ -35,6 +39,8 @@ export interface Profile {
   accent: string;
   theme: ThemePref;
   onboarded: boolean;
+  /** One notification a day, at this local time. null = off. */
+  nudgeTime: string | null;
 }
 
 export interface Usage {

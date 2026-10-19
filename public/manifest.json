@@ -7,5 +7,31 @@
   "background_color": "#FAF8F5",
   "theme_color": "#FAF8F5",
   "orientation": "portrait-primary",
-  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "share_target": {
+    "action": "/",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "shortcuts": [
+    {
+      "name": "Pick one for me",
+      "url": "/now"
+    },
+    {
+      "name": "Open space",
+      "url": "/space"
+    }
+  ]
 }
