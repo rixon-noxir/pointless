@@ -1,0 +1,11 @@
+{
+  "name": "Pointless",
+  "short_name": "Pointless",
+  "description": "A quiet place for your tasks, notes, links and reminders.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAF8F5",
+  "theme_color": "#FAF8F5",
+  "orientation": "portrait-primary",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
