@@ -27,6 +27,7 @@ const ItemPage = lazyRetry(() => import('@/pages/ItemPage'));
 const You = lazyRetry(() => import('@/pages/You'));
 const About = lazyRetry(() => import('@/pages/About'));
 const Now = lazyRetry(() => import('@/pages/Now'));
+const Plan = lazyRetry(() => import('@/pages/Plan'));
 
 function PageLoader() {
   return (
@@ -72,6 +73,8 @@ export default function App() {
             <Route path="you" element={<You />} />
             <Route path="about" element={<About />} />
             <Route path="now" element={<Now />} />
+            <Route path="plan" element={<Plan />} />
+            <Route path="day" element={<Plan />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

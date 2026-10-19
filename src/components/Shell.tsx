@@ -1,9 +1,10 @@
 import { NavLink, Outlet } from 'react-router';
-import { Sun, LayoutList, PenLine, CircleUser } from 'lucide-react';
+import { Sun, CalendarDays, LayoutList, PenLine, CircleUser } from 'lucide-react';
 import { useStore } from '@/lib/store';
 
 const nav = [
   { to: '/', label: 'Today', icon: Sun, end: true },
+  { to: '/plan', label: 'Plan', icon: CalendarDays },
   { to: '/all', label: 'Everything', icon: LayoutList },
   { to: '/space', label: 'Space', icon: PenLine },
   { to: '/you', label: 'You', icon: CircleUser },
@@ -47,7 +48,7 @@ export default function Shell() {
         className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-paper/90 backdrop-blur border-t border-line"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <div className="grid grid-cols-4 h-16">
+        <div className="grid grid-cols-5 h-16">
           {nav.map((n) => (
             <NavLink
               key={n.to}

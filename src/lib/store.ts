@@ -31,6 +31,8 @@ interface State {
   lastNudgedOn: string | null;
   /** Repeat suggestions the person said no to, by normalised title. */
   dismissedRepeats: string[];
+  /** The how-it-works card on Today has been closed. */
+  guideDismissed: boolean;
 
   setProfile: (patch: Partial<Profile>) => void;
   addItem: (n: NewItem) => Item;
@@ -46,6 +48,7 @@ interface State {
   setLastNudgedOn: (d: string) => void;
   setRepeat: (id: string, days: number | undefined) => void;
   dismissRepeat: (key: string) => void;
+  dismissGuide: () => void;
 
   setScratchText: (text: string) => void;
   addStroke: (s: Stroke) => void;
@@ -88,6 +91,7 @@ export const useStore = create<State>()(
       notified: [],
       lastNudgedOn: null,
       dismissedRepeats: [],
+      guideDismissed: false,
 
       setProfile: (patch) => set((s) => ({ profile: { ...s.profile, ...patch } })),
 
@@ -191,6 +195,7 @@ export const useStore = create<State>()(
       setLastNudgedOn: (d) => set({ lastNudgedOn: d }),
       setRepeat: (id, days) =>
         set((s) => ({ items: s.items.map((i) => (i.id === id ? { ...i, repeatDays: days, updatedAt: nowIso() } : i)) })),
+      dismissGuide: () => set({ guideDismissed: true }),
       dismissRepeat: (key) =>
         set((s) => ({ dismissedRepeats: s.dismissedRepeats.includes(key) ? s.dismissedRepeats : [...s.dismissedRepeats, key] })),
 
@@ -213,6 +218,7 @@ export const useStore = create<State>()(
           notified: [],
           lastNudgedOn: null,
           dismissedRepeats: [],
+          guideDismissed: true,
         }),
 
       resetAll: () =>
@@ -224,6 +230,7 @@ export const useStore = create<State>()(
           notified: [],
           lastNudgedOn: null,
           dismissedRepeats: [],
+          guideDismissed: true,
         }),
     }),
     {

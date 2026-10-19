@@ -4,6 +4,7 @@ import type { Item } from '@/lib/types';
 import { useStore } from '@/lib/store';
 import { ageLabel, whenLabel, isOverdue } from '@/lib/time';
 import { TypeIcon } from './TypeBits';
+import { TYPE_META } from '@/lib/typeMeta';
 
 function host(url?: string): string {
   if (!url) return '';
@@ -26,7 +27,7 @@ export default function ItemRow({ item }: { item: Item }) {
     navigate(`/item/${item.id}`);
   };
 
-  const meta: string[] = [];
+  const meta: string[] = [TYPE_META[item.type].label];
   if (item.due && !item.done) meta.push(whenLabel(item.due));
   else if (item.type === 'link') meta.push(host(item.url));
   else meta.push(ageLabel(item.updatedAt));

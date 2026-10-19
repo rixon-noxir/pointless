@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CornerDownLeft } from 'lucide-react';
+import { CornerDownLeft, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router';
 import { useStore } from '@/lib/store';
-import { parseCapture } from '@/lib/parse';
+import { parseCapture, detectIntent, type Intent } from '@/lib/parse';
 import { orderedTypes } from '@/lib/adapt';
 import type { ItemType } from '@/lib/types';
 import { whenLabel } from '@/lib/time';
@@ -66,8 +67,10 @@ export default function Capture({ autoFocus = false, initial, onSaved }: Props) 
   const addItem = useStore((s) => s.addItem);
   const usage = useStore((s) => s.usage);
   const count = useStore((s) => s.items.length);
+  const navigate = useNavigate();
 
   const parsed = useMemo(() => (text.trim() ? parseCapture(text) : null), [text]);
+  const intent = useMemo(() => (override ? null : detectIntent(text)), [text, override]);
   const type: ItemType = override ?? parsed?.type ?? 'note';
   const types = useMemo(() => orderedTypes(usage), [usage]);
   const demo = useTypewriter(count < 3 && !text);
@@ -84,7 +87,25 @@ export default function Capture({ autoFocus = false, initial, onSaved }: Props) 
     if (initial) requestAnimationFrame(grow);
   }, [initial]);
 
+  const INTENT_UI: Record<Intent, { label: string; to: string }> = {
+    plan: { label: /tomorrow/i.test(text) ? 'Plan tomorrow' : /week/i.test(text) ? 'Plan my week' : 'Plan my day', to: /tomorrow/i.test(text) ? '/plan?d=tomorrow' : '/plan' },
+    pick: { label: 'Pick one for me', to: '/now' },
+    think: { label: 'Open Space to think it out', to: '/space' },
+  };
+
+  const goIntent = () => {
+    if (!intent) return;
+    const target = INTENT_UI[intent].to;
+    setText('');
+    requestAnimationFrame(grow);
+    navigate(target);
+  };
+
   const submit = () => {
+    if (intent) {
+      goIntent();
+      return;
+    }
     if (!parsed) return;
     addItem({ type, title: parsed.title, body: parsed.body, url: parsed.url, due: parsed.due });
     if (type === 'reminder' && parsed.due) askForNotifications();
@@ -103,7 +124,7 @@ export default function Capture({ autoFocus = false, initial, onSaved }: Props) 
         autoFocus={autoFocus}
         value={text}
         rows={1}
-        placeholder={count < 3 ? demo || ' ' : "What's on your mind?"}
+        placeholder="What's on your mind?"
         aria-label="Drop something here"
         onChange={(e) => {
           setText(e.target.value);
@@ -120,7 +141,20 @@ export default function Capture({ autoFocus = false, initial, onSaved }: Props) 
       />
 
       <div className="flex items-center gap-2 px-3 pb-3 flex-wrap min-h-[44px]">
-        {parsed ? (
+        {parsed && intent ? (
+          <>
+            <button
+              type="button"
+              onClick={goIntent}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-ink text-paper text-[13px] font-medium"
+            >
+              {INTENT_UI[intent].label} <ArrowRight size={13} />
+            </button>
+            <button type="button" onClick={() => setOverride(parsed.type)} className="h-8 px-3 rounded-full text-[13px] text-ink-2 hover:text-ink">
+              or save it as a {TYPE_META[parsed.type].label.toLowerCase()}
+            </button>
+          </>
+        ) : parsed ? (
           <>
             {types.map((t) => (
               <Chip key={t} active={type === t} onClick={() => setOverride(t)} title={`Save as ${TYPE_META[t].label.toLowerCase()}`}>
@@ -141,7 +175,11 @@ export default function Capture({ autoFocus = false, initial, onSaved }: Props) 
           </>
         ) : (
           <span className="text-[12px] text-ink-3 px-1 fade-in">
-            {justSaved ?? (count < 3 ? 'Type anything. It works out what it is.' : 'A task, a thought, a link, or "remind me friday 3pm". It sorts itself.')}
+            {justSaved ?? (count < 3 ? (
+              <>
+                Try: <span className="text-ink-2">"{demo}"</span>
+              </>
+            ) : 'A task, a thought, a link, or "remind me friday 3pm". It sorts itself.')}
           </span>
         )}
       </div>

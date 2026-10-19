@@ -3,7 +3,7 @@ import { ArrowRight } from 'lucide-react';
 import { useStore, applyAppearance } from '@/lib/store';
 import { ACCENTS } from '@/lib/types';
 
-/** First open. Three small questions, then it is theirs. */
+/** First open. What this is, then three small questions, then it is theirs. */
 export default function Welcome() {
   const setProfile = useStore((s) => s.setProfile);
   const profile = useStore((s) => s.profile);
@@ -35,7 +35,33 @@ export default function Welcome() {
             }}
           >
             <p className="font-serif italic text-[20px] text-ink-2">Hi.</p>
-            <h1 className="mt-2 text-[28px] font-medium tracking-tight">What should this call you?</h1>
+            <h1 className="mt-2 text-[28px] font-medium tracking-tight leading-tight">A quiet place for the stuff in your head.</h1>
+            <ul className="mt-6 space-y-3 text-[15px] leading-relaxed text-ink-2">
+              <li>
+                <span className="text-ink font-medium">Type anything into one box.</span> A to-do, a thought, a link, or "remind me
+                friday 3pm". It works out which and files it.
+              </li>
+              <li>
+                <span className="text-ink font-medium">Today stays short.</span> Only what is due, pinned, or new. The rest is one
+                searchable list.
+              </li>
+              <li>
+                <span className="text-ink font-medium">Nothing to set up.</span> No folders, no templates. Things you stop touching
+                tuck themselves away. Nothing is deleted for you.
+              </li>
+            </ul>
+            <Next label="Okay" />
+          </form>
+        )}
+
+        {step === 1 && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setStep(2);
+            }}
+          >
+            <h1 className="text-[28px] font-medium tracking-tight">What should this call you?</h1>
             <input
               autoFocus
               value={name}
@@ -47,11 +73,11 @@ export default function Welcome() {
           </form>
         )}
 
-        {step === 1 && (
+        {step === 2 && (
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              setStep(2);
+              setStep(3);
             }}
           >
             <h1 className="text-[28px] font-medium tracking-tight">Name this space.</h1>
@@ -67,7 +93,7 @@ export default function Welcome() {
           </form>
         )}
 
-        {step === 2 && (
+        {step === 3 && (
           <form
             onSubmit={(e) => {
               e.preventDefault();

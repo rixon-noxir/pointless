@@ -78,3 +78,26 @@ export function daysSince(iso: string | undefined, now = new Date()): number {
   if (!iso) return Infinity;
   return (now.getTime() - new Date(iso).getTime()) / DAY;
 }
+
+/** Local calendar date as YYYY-MM-DD. */
+export function dateKey(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+export function fromDateKey(key: string): Date {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+
+export function addDays(d: Date, n: number): Date {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
+export function hourLabel(h: number): string {
+  const ap = h >= 12 ? 'PM' : 'AM';
+  const hh = h % 12 === 0 ? 12 : h % 12;
+  return `${hh} ${ap}`;
+}

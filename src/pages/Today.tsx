@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, CalendarDays, X } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { reachFor, routineHint, repeatSuggestion, pickableCount } from '@/lib/adapt';
 import { isOverdue, isDueToday } from '@/lib/time';
@@ -28,6 +28,8 @@ export default function Today() {
   const name = useStore((s) => s.profile.name);
   const usage = useStore((s) => s.usage);
   const dismissed = useStore((s) => s.dismissedRepeats);
+  const guideDismissed = useStore((s) => s.guideDismissed);
+  const dismissGuide = useStore((s) => s.dismissGuide);
   const location = useLocation();
   const navigate = useNavigate();
   // Read once on arrival, then clean the URL so a refresh does not re-share it.
@@ -60,22 +62,50 @@ export default function Today() {
 
       <Capture key={initial ?? ''} autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768} initial={initial} />
 
-      {pickable >= 2 && (
+      <div className="mt-3 flex flex-wrap gap-2">
         <Link
-          to="/now"
-          className="mt-3 inline-flex items-center gap-2 h-9 px-4 rounded-full border border-line text-[13px] text-ink-2 hover:text-ink hover:border-ink-3"
+          to="/plan"
+          className="inline-flex items-center gap-2 h-9 px-4 rounded-full border border-line text-[13px] text-ink-2 hover:text-ink hover:border-ink-3"
         >
-          <Sparkles size={14} /> Can't decide? Pick one for me
+          <CalendarDays size={14} /> Plan my day
         </Link>
-      )}
+        {pickable >= 2 && (
+          <Link
+            to="/now"
+            className="inline-flex items-center gap-2 h-9 px-4 rounded-full border border-line text-[13px] text-ink-2 hover:text-ink hover:border-ink-3"
+          >
+            <Sparkles size={14} /> Can't decide? Pick one for me
+          </Link>
+        )}
+      </div>
 
       {repeat && <RepeatCard s={repeat} />}
 
-      {items.length === 0 && (
-        <p className="mt-10 text-[15px] text-ink-2 leading-relaxed max-w-md">
-          This page stays short on purpose. Drop things in the box above and what matters today will show up here. Everything
-          else lives under <Link to="/all" className="underline underline-offset-4 decoration-dashed">Everything</Link>.
-        </p>
+      {!guideDismissed && items.length < 8 && (
+        <div className="fade-in mt-6 rounded-2xl border border-dashed border-line px-4 py-4 text-[14px] leading-relaxed text-ink-2">
+          <div className="flex items-start justify-between gap-3">
+            <p className="font-medium text-ink">How this works</p>
+            <button type="button" onClick={dismissGuide} aria-label="Close" className="p-1 -m-1 text-ink-3 hover:text-ink">
+              <X size={16} />
+            </button>
+          </div>
+          <ul className="mt-2 space-y-1.5 list-disc pl-4">
+            <li>
+              <span className="text-ink">Drop anything in the box.</span> A to-do, a thought, a link, or "remind me friday 3pm". It works out which one it is and files it.
+            </li>
+            <li>
+              <span className="text-ink">This page stays short.</span> Only what is due, pinned, or new shows here. The full list is under{' '}
+              <Link to="/all" className="underline underline-offset-4 decoration-dashed">Everything</Link>, with search.
+            </li>
+            <li>
+              <span className="text-ink">Space</span> is a blank page for thinking out loud and sketching.
+            </li>
+            <li>Nothing to set up. Things you stop touching tuck themselves away. Nothing is ever deleted for you.</li>
+          </ul>
+          <button type="button" onClick={dismissGuide} className="mt-3 h-8 px-3 rounded-full bg-ink text-paper text-[13px] font-medium">
+            Got it
+          </button>
+        </div>
       )}
 
       {due.length > 0 && (
@@ -101,7 +131,7 @@ export default function Today() {
 
       {recent.length > 0 && (
         <section>
-          <SectionTitle aside={<Link to="/all" className="hover:text-ink">everything ↗</Link>}>Just dropped</SectionTitle>
+          <SectionTitle aside={<Link to="/all" className="hover:text-ink">everything ↗</Link>}>Recent</SectionTitle>
           {recent.map((i) => <ItemRow key={i.id} item={i} />)}
         </section>
       )}

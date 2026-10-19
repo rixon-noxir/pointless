@@ -164,3 +164,32 @@ export function parseCapture(raw: string, now = new Date()): Parsed {
   // Notes
   return { type: 'note', title: first, body: rest };
 }
+
+export type Intent = 'plan' | 'pick' | 'think';
+
+const INTENTS: [RegExp, Intent][] = [
+  [
+    /\b(what (should|do) i (do|work on|start with)|can'?t decide|pick (one|something) for me|where (do|should) i (start|begin)|i (don'?t|dont) know what to do)\b/i,
+    'pick',
+  ],
+  [
+    /\b(organi[sz]e|plan|sort( out)?|map( out)?|structure|schedule|figure out|lay out|set up)\b[^\n]*\b(my |the |this )?(day|today|tomorrow|morning|afternoon|evening|week|schedule)\b/i,
+    'plan',
+  ],
+  [
+    /\b(organi[sz]e|sort( out)?|clear|untangle|think (through|about)|brain ?dump|get|collect|process)\b[^\n]*\b(my |the )?(thoughts|head|mind|ideas|brain|feelings)\b/i,
+    'think',
+  ],
+];
+
+/**
+ * Some captures are not things to store, they are asks: "organize my day", "what should I do".
+ * Those get taken somewhere instead of filed.
+ */
+export function detectIntent(text: string): Intent | null {
+  const t = text.trim();
+  if (!t || t.length > 120 || t.includes('\n')) return null;
+  if (REMIND_START.test(t)) return null;
+  for (const [re, intent] of INTENTS) if (re.test(t)) return intent;
+  return null;
+}
