@@ -1,6 +1,6 @@
 # Pointless
 
-A quiet place for tasks, notes, links and reminders. Built for people who find Notion overwhelming.
+A quiet place for tasks, notes, links and reminders. Built for people who get overwhelmed by big workspace apps.
 
 Created for you. Catered for you.
 
