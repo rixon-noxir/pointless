@@ -98,7 +98,7 @@ export default function Today() {
               <Link to="/all" className="underline underline-offset-4 decoration-dashed">Everything</Link>, with search.
             </li>
             <li>
-              <span className="text-ink">Space</span> is a blank page for thinking out loud and sketching.
+              <span className="text-ink">Notes</span> file themselves. Write without a title; each note lands in Work, School, Home and so on. Move one and it learns.
             </li>
             <li>Nothing to set up. Things you stop touching tuck themselves away. Nothing is ever deleted for you.</li>
           </ul>

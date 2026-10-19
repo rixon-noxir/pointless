@@ -90,7 +90,7 @@ export default function Capture({ autoFocus = false, initial, onSaved }: Props) 
   const INTENT_UI: Record<Intent, { label: string; to: string }> = {
     plan: { label: /tomorrow/i.test(text) ? 'Plan tomorrow' : /week/i.test(text) ? 'Plan my week' : 'Plan my day', to: /tomorrow/i.test(text) ? '/plan?d=tomorrow' : '/plan' },
     pick: { label: 'Pick one for me', to: '/now' },
-    think: { label: 'Open Space to think it out', to: '/space' },
+    think: { label: 'Open a note to think it out', to: '/space' },
   };
 
   const goIntent = () => {

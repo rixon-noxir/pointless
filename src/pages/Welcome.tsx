@@ -46,8 +46,8 @@ export default function Welcome() {
                 searchable list.
               </li>
               <li>
-                <span className="text-ink font-medium">Nothing to set up.</span> No folders, no templates. Things you stop touching
-                tuck themselves away. Nothing is deleted for you.
+                <span className="text-ink font-medium">Notes file themselves.</span> Write without a title. Each note reads itself and
+                lands in Work, School, Home, Health and so on. Nothing to set up, nothing deleted for you.
               </li>
             </ul>
             <Next label="Okay" />

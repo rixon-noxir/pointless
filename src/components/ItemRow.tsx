@@ -24,10 +24,10 @@ export default function ItemRow({ item }: { item: Item }) {
 
   const open = () => {
     touch(item.id);
-    navigate(`/item/${item.id}`);
+    navigate(item.type === 'note' ? `/note/${item.id}` : `/item/${item.id}`);
   };
 
-  const meta: string[] = [TYPE_META[item.type].label];
+  const meta: string[] = [item.type === 'note' && item.folder ? `Note · ${item.folder}` : TYPE_META[item.type].label];
   if (item.due && !item.done) meta.push(whenLabel(item.due));
   else if (item.type === 'link') meta.push(host(item.url));
   else meta.push(ageLabel(item.updatedAt));
@@ -56,7 +56,7 @@ export default function ItemRow({ item }: { item: Item }) {
       <button type="button" onClick={open} className="flex-1 min-w-0 text-left">
         <div className={`text-[15px] leading-snug truncate ${item.done ? 'line-through' : ''}`}>
           {item.pinned && <Pin size={12} className="inline -mt-0.5 mr-1 text-accent-ink" />}
-          {item.title}
+          {(item.type === 'note' && item.autoTitle) || item.title || 'Untitled'}
         </div>
         <div className={`text-[12px] mt-0.5 truncate ${overdue ? 'text-accent-ink font-medium' : 'text-ink-3'}`}>
           {meta.join(' Â· ')}

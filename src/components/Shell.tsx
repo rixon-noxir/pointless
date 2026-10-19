@@ -1,12 +1,12 @@
 import { NavLink, Outlet } from 'react-router';
-import { Sun, CalendarDays, LayoutList, PenLine, CircleUser } from 'lucide-react';
+import { Sun, CalendarDays, LayoutList, NotebookPen, CircleUser } from 'lucide-react';
 import { useStore } from '@/lib/store';
 
 const nav = [
   { to: '/', label: 'Today', icon: Sun, end: true },
   { to: '/plan', label: 'Plan', icon: CalendarDays },
   { to: '/all', label: 'Everything', icon: LayoutList },
-  { to: '/space', label: 'Space', icon: PenLine },
+  { to: '/space', label: 'Notes', icon: NotebookPen },
   { to: '/you', label: 'You', icon: CircleUser },
 ];
 

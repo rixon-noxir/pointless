@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router';
-import { Download, Upload, Bell, BellOff } from 'lucide-react';
+import { Download, Upload, Bell, BellOff, X, Plus } from 'lucide-react';
 import { useStore, applyAppearance, type Snapshot } from '@/lib/store';
 import { ACCENTS, type ThemePref } from '@/lib/types';
 import { Chip, SectionTitle } from '@/components/TypeBits';
@@ -27,6 +27,10 @@ export default function You() {
   const resetAll = useStore((s) => s.resetAll);
   const items = useStore((s) => s.items);
   const usage = useStore((s) => s.usage);
+  const folders = useStore((s) => s.folders);
+  const addFolder = useStore((s) => s.addFolder);
+  const removeFolder = useStore((s) => s.removeFolder);
+  const [newFolder, setNewFolder] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -142,6 +146,46 @@ export default function You() {
       <p className="mt-2 text-[12px] text-ink-3">
         A single "here is today" message at the time you tend to use this. It only fires while the app is open or installed on your home screen.
       </p>
+
+      <SectionTitle>Notes</SectionTitle>
+      <div className="flex items-center gap-3 flex-wrap">
+        <Chip active={profile.smartSort} onClick={() => update({ smartSort: !profile.smartSort })}>
+          Smart sorting with AI
+        </Chip>
+      </div>
+      <p className="mt-2 text-[12px] text-ink-3">
+        Off: notes are sorted on this device by the words in them, and learn from where you move things. On: when you leave a note, its text is also
+        sent to an AI to pick the folder and write a title. That is the only time anything leaves your device.
+      </p>
+      <div className="mt-4 flex gap-2 flex-wrap items-center">
+        {folders.map((f) => (
+          <span key={f} className="inline-flex items-center gap-1 h-8 pl-3 pr-1.5 rounded-full border border-line text-[13px]">
+            {f}
+            <button type="button" aria-label={`Remove ${f}`} onClick={() => removeFolder(f)} className="p-1 rounded-full text-ink-3 hover:text-ink hover:bg-paper-2">
+              <X size={12} />
+            </button>
+          </span>
+        ))}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            addFolder(newFolder);
+            setNewFolder('');
+          }}
+          className="inline-flex items-center gap-1"
+        >
+          <input
+            value={newFolder}
+            onChange={(e) => setNewFolder(e.target.value)}
+            placeholder="new folder"
+            aria-label="New folder"
+            className="h-8 w-32 px-3 rounded-full bg-paper-2/70 border border-line focus:border-ink-3 outline-none text-[13px]"
+          />
+          <button type="submit" aria-label="Add folder" className="p-1.5 rounded-full text-ink-2 hover:bg-paper-2">
+            <Plus size={14} />
+          </button>
+        </form>
+      </div>
 
       <SectionTitle>Your data</SectionTitle>
       <p className="text-[14px] text-ink-2 mb-3">

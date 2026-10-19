@@ -13,6 +13,12 @@ export interface Item {
   doneAt?: string;
   /** Flexible rhythm: a fresh copy is due this many days after it is finished. */
   repeatDays?: number;
+  /** Notes: the folder it was filed into. */
+  folder?: string;
+  /** Notes: true once the person chose the folder by hand, so auto-sorting leaves it alone. */
+  folderByHand?: boolean;
+  /** Notes: a short title written by the sorter, used in lists. */
+  autoTitle?: string;
   pinned: boolean;
   tags: string[];
   createdAt: string;
@@ -41,6 +47,8 @@ export interface Profile {
   onboarded: boolean;
   /** One notification a day, at this local time. null = off. */
   nudgeTime: string | null;
+  /** Send note text to the AI sorter (opt-in; the note leaves the device). */
+  smartSort: boolean;
 }
 
 export interface Usage {

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Item, ItemType, Profile, Scratch, Stroke, Usage } from './types';
 import { staleIds } from './adapt';
+import { DEFAULT_FOLDERS, suggestFolder, learn, autoTitle, type SortModel } from './sort';
 
 export interface NewItem {
   type: ItemType;
@@ -33,6 +34,12 @@ interface State {
   dismissedRepeats: string[];
   /** The how-it-works card on Today has been closed. */
   guideDismissed: boolean;
+  /** Note folders, in display order. */
+  folders: string[];
+  /** Learned word counts per folder for on-device sorting. */
+  sortModel: SortModel;
+  /** The old free-text scratch page has been turned into a note. */
+  scratchMigrated: boolean;
 
   setProfile: (patch: Partial<Profile>) => void;
   addItem: (n: NewItem) => Item;
@@ -49,6 +56,15 @@ interface State {
   setRepeat: (id: string, days: number | undefined) => void;
   dismissRepeat: (key: string) => void;
   dismissGuide: () => void;
+  /** Files a note on-device. Leaves notes the person filed by hand alone. */
+  fileNote: (id: string) => void;
+  /** The person picks a folder. The sorter learns from it. */
+  setFolder: (id: string, folder: string | null) => void;
+  addFolder: (name: string) => string;
+  removeFolder: (name: string) => void;
+  /** Result from the AI sorter: applied only if the person has not chosen by hand. */
+  applySmartSort: (id: string, folder: string, title: string) => void;
+  migrateScratch: () => void;
 
   setScratchText: (text: string) => void;
   addStroke: (s: Stroke) => void;
@@ -72,6 +88,7 @@ const defaultProfile = (): Profile => ({
   theme: 'system',
   onboarded: false,
   nudgeTime: null,
+  smartSort: false,
 });
 
 const nowIso = () => new Date().toISOString();
@@ -92,6 +109,9 @@ export const useStore = create<State>()(
       lastNudgedOn: null,
       dismissedRepeats: [],
       guideDismissed: false,
+      folders: [...DEFAULT_FOLDERS],
+      sortModel: {},
+      scratchMigrated: false,
 
       setProfile: (patch) => set((s) => ({ profile: { ...s.profile, ...patch } })),
 
@@ -100,7 +120,7 @@ export const useStore = create<State>()(
         const item: Item = {
           id: newId(),
           type: n.type,
-          title: n.title.trim() || 'Untitled',
+          title: n.title.trim() || (n.type === 'note' ? '' : 'Untitled'),
           body: n.body ?? '',
           url: n.url,
           due: n.due,
@@ -112,6 +132,13 @@ export const useStore = create<State>()(
           openCount: 0,
           tucked: false,
         };
+        if (item.type === 'note') {
+          const text = `${item.title}
+${item.body}`;
+          const sug = suggestFolder(text, get().folders, get().sortModel);
+          if (sug.folder) item.folder = sug.folder;
+          item.autoTitle = autoTitle(text);
+        }
         set((s) => {
           const hours = [...s.usage.hours];
           hours[new Date().getHours()] += 1;
@@ -196,6 +223,71 @@ export const useStore = create<State>()(
       setRepeat: (id, days) =>
         set((s) => ({ items: s.items.map((i) => (i.id === id ? { ...i, repeatDays: days, updatedAt: nowIso() } : i)) })),
       dismissGuide: () => set({ guideDismissed: true }),
+
+      fileNote: (id) =>
+        set((s) => {
+          const i = s.items.find((x) => x.id === id);
+          if (!i || i.type !== 'note' || i.folderByHand) return {};
+          const text = `${i.title}
+${i.body}`;
+          const sug = suggestFolder(text, s.folders, s.sortModel);
+          const title = autoTitle(text);
+          if (sug.folder === (i.folder ?? null) && title === i.autoTitle) return {};
+          return { items: s.items.map((x) => (x.id === id ? { ...x, folder: sug.folder ?? undefined, autoTitle: title } : x)) };
+        }),
+
+      setFolder: (id, folder) =>
+        set((s) => {
+          const i = s.items.find((x) => x.id === id);
+          if (!i) return {};
+          const text = `${i.title}
+${i.body}`;
+          let model = s.sortModel;
+          if (i.folder && i.folder !== folder) model = learn(model, i.folder, text, -1);
+          if (folder) model = learn(model, folder, text, 1);
+          return {
+            sortModel: model,
+            items: s.items.map((x) => (x.id === id ? { ...x, folder: folder ?? undefined, folderByHand: true, updatedAt: nowIso() } : x)),
+          };
+        }),
+
+      addFolder: (name) => {
+        const clean = name.trim().replace(/\s+/g, ' ').slice(0, 24);
+        if (!clean) return '';
+        const existing = get().folders.find((f) => f.toLowerCase() === clean.toLowerCase());
+        if (existing) return existing;
+        set((s) => ({ folders: [...s.folders, clean] }));
+        return clean;
+      },
+
+      removeFolder: (name) =>
+        set((s) => ({
+          folders: s.folders.filter((f) => f !== name),
+          items: s.items.map((x) => (x.folder === name ? { ...x, folder: undefined, folderByHand: false } : x)),
+        })),
+
+      applySmartSort: (id, folder, title) =>
+        set((s) => {
+          const i = s.items.find((x) => x.id === id);
+          if (!i || i.folderByHand) return {};
+          const folders = s.folders.some((f) => f.toLowerCase() === folder.toLowerCase()) ? s.folders : [...s.folders, folder];
+          const real = folders.find((f) => f.toLowerCase() === folder.toLowerCase()) ?? folder;
+          return {
+            folders,
+            items: s.items.map((x) => (x.id === id ? { ...x, folder: real, autoTitle: title || x.autoTitle } : x)),
+          };
+        }),
+
+      migrateScratch: () => {
+        const s = get();
+        if (s.scratchMigrated) return;
+        const text = s.scratch.text.trim();
+        if (text) {
+          const [first, ...rest] = text.split('\n');
+          s.addItem({ type: 'note', title: first.trim() || 'Note', body: rest.join('\n').trim() });
+        }
+        set({ scratchMigrated: true, scratch: { ...get().scratch, text: '' } });
+      },
       dismissRepeat: (key) =>
         set((s) => ({ dismissedRepeats: s.dismissedRepeats.includes(key) ? s.dismissedRepeats : [...s.dismissedRepeats, key] })),
 
