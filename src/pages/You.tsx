@@ -35,6 +35,14 @@ export default function You() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [, bump] = useState(0);
+  // Only people who have unlocked team notes on this device see the link.
+  const [onTeam] = useState(() => {
+    try {
+      return !!(JSON.parse(localStorage.getItem('pointless-team') ?? '{}') as { code?: string }).code;
+    } catch {
+      return false;
+    }
+  });
 
   const update = (patch: Parameters<typeof setProfile>[0]) => {
     setProfile(patch);
@@ -222,7 +230,10 @@ export default function You() {
         ) : (
           <button type="button" onClick={() => setConfirmReset(true)} className="hover:text-ink">start over</button>
         )}
-        <Link to="/about" className="hover:text-ink">about ↗</Link>
+        <span className="inline-flex gap-4">
+          {onTeam && <Link to="/team" className="hover:text-ink">team notes ↗</Link>}
+          <Link to="/about" className="hover:text-ink">about ↗</Link>
+        </span>
       </div>
     </div>
   );
