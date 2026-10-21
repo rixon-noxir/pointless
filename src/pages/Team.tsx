@@ -3,7 +3,7 @@ import { Check, RotateCcw, Send } from 'lucide-react';
 import { Chip, SectionTitle } from '@/components/TypeBits';
 
 /**
- * Team: notes for whoever is building the app, filed as issues in the app's repo.
+ * Team: Colton's notes on what to change in the app, filed as issues in the app's repo.
  * Pre-release only. To drop it: delete this page, api/team.ts, its route in App.tsx and its entry in Shell.tsx.
  */
 
@@ -13,7 +13,6 @@ interface Note {
   title: string;
   text: string;
   kind: Kind;
-  from: string;
   done: boolean;
   createdAt: string;
   closedAt: string | null;
@@ -25,24 +24,6 @@ const KINDS: { v: Kind; label: string }[] = [
   { v: 'change', label: 'Change' },
   { v: 'bug', label: 'Something broke' },
 ];
-
-const KEY = 'pointless-team-name';
-
-function loadName(): string {
-  try {
-    return localStorage.getItem(KEY) ?? '';
-  } catch {
-    return '';
-  }
-}
-
-function saveName(v: string) {
-  try {
-    localStorage.setItem(KEY, v);
-  } catch {
-    /* private window: just won't remember */
-  }
-}
 
 async function call(method: 'GET' | 'POST' | 'PATCH', body?: unknown) {
   const res = await fetch('/api/team', {
@@ -65,7 +46,6 @@ function when(iso: string): string {
 }
 
 export default function Team() {
-  const [from, setFrom] = useState(loadName);
   const [notes, setNotes] = useState<Note[] | null>(null);
   const [text, setText] = useState('');
   const [kind, setKind] = useState<Kind>('idea');
@@ -88,7 +68,7 @@ export default function Team() {
     if (!text.trim() || busy) return;
     setBusy(true);
     try {
-      const d = await call('POST', { text, kind, from });
+      const d = await call('POST', { text, kind });
       if (d.note) setNotes((n) => [d.note!, ...(n ?? [])]);
       setText('');
       setErr(null);
@@ -114,7 +94,7 @@ export default function Team() {
   return (
     <div className="fade-in">
       <h1 className="text-[32px] leading-none font-medium tracking-tight">Team</h1>
-      <p className="mt-2 text-[15px] text-ink-2">What should change in the app.</p>
+      <p className="mt-2 text-[15px] text-ink-2">Colton's notes on what should change.</p>
 
       <form onSubmit={submit} className="mt-6 rounded-2xl border border-line bg-paper-2/40 p-3">
         <textarea
@@ -134,16 +114,6 @@ export default function Team() {
               {k.label}
             </Chip>
           ))}
-          <input
-            value={from}
-            onChange={(e) => {
-              setFrom(e.target.value);
-              saveName(e.target.value);
-            }}
-            placeholder="your name"
-            aria-label="Your name"
-            className="h-8 w-28 px-3 rounded-full bg-transparent border border-line focus:border-ink-3 outline-none text-[13px]"
-          />
           <button
             type="submit"
             disabled={busy || !text.trim()}
@@ -204,7 +174,7 @@ function NoteRow({ n, onToggle }: { n: Note; onToggle: () => void }) {
         <p className={`text-[15px] leading-snug whitespace-pre-wrap break-words ${n.done ? 'text-ink-3 line-through decoration-ink-3/50' : ''}`}>{n.text || n.title}</p>
         <p className="mt-1 text-[12px] text-ink-3">
           {KINDS.find((k) => k.v === n.kind)?.label}
-          {n.from && ` · ${n.from}`} · {when(n.createdAt)} ·{' '}
+          {' · '}{when(n.createdAt)} ·{' '}
           <a href={n.url} target="_blank" rel="noopener noreferrer" className="hover:text-ink">
             #{n.number} ↗
           </a>

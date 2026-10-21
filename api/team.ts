@@ -1,13 +1,13 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 /**
- * Team notes: suggestions from the people building the app, filed as GitHub issues in the app's repo
+ * Team notes: Colton's suggestions for the app, filed as GitHub issues in the app's repo
  * so they land where the work happens. Pre-release only: open to anyone with the app, so drop it before launch.
  * Needs GITHUB_TOKEN (fine-grained, Issues read/write on the repo) in the Vercel project env.
  * GITHUB_REPO defaults to rixon-noxir/pointless.
  *
  * GET              list open + recently done notes
- * POST {text, kind, from}   file a new note
+ * POST {text, kind}         file a new note
  * PATCH {number, done}      mark done / reopen
  */
 
@@ -80,15 +80,12 @@ function titleFrom(text: string): string {
 
 function toNote(i: GhIssue) {
   const kind = (i.labels.map((l) => l.name).find((n) => (KINDS as readonly string[]).includes(n)) ?? 'idea') as Kind;
-  const body = i.body ?? '';
-  const from = /^_from (.+?)_$/m.exec(body)?.[1] ?? '';
-  const text = body.replace(/\n*^_from .+?_$/m, '').trim();
+  const text = (i.body ?? '').trim();
   return {
     number: i.number,
     title: i.title,
     text,
     kind,
-    from,
     done: i.state === 'closed',
     createdAt: i.created_at,
     closedAt: i.closed_at,
@@ -101,7 +98,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
   const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
   if (!allowed(ip)) return send(res, 429, { error: 'Slow down.' });
-
 
   try {
     if (req.method === 'GET') {
@@ -122,12 +118,11 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       const text = typeof parsed.text === 'string' ? parsed.text.trim().slice(0, 8000) : '';
       if (!text) return send(res, 400, { error: 'Write something first.' });
       const kind: Kind = (KINDS as readonly unknown[]).includes(parsed.kind) ? (parsed.kind as Kind) : 'idea';
-      const from = typeof parsed.from === 'string' ? parsed.from.trim().replace(/[_\n]/g, ' ').slice(0, 40) : '';
       const r = await gh('/issues', {
         method: 'POST',
         body: JSON.stringify({
           title: titleFrom(text),
-          body: from ? `${text}\n\n_from ${from}_` : text,
+          body: text,
           labels: [LABEL, kind],
         }),
       });
