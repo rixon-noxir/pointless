@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router';
-import { ArrowLeft, Check, RotateCcw, Send } from 'lucide-react';
+import { Check, RotateCcw, Send } from 'lucide-react';
 import { Chip, SectionTitle } from '@/components/TypeBits';
 
 /**
- * Team notes: a page for the people building the app, not for the person using it.
- * Not in the nav. Reached at /team and unlocked with the team code; notes are filed as issues in the app's repo.
+ * Team: notes for whoever is building the app, filed as issues in the app's repo.
+ * Pre-release only. To drop it: delete this page, api/team.ts, its route in App.tsx and its entry in Shell.tsx.
  */
 
 type Kind = 'idea' | 'bug' | 'change';
@@ -27,34 +26,32 @@ const KINDS: { v: Kind; label: string }[] = [
   { v: 'bug', label: 'Something broke' },
 ];
 
-const KEY = 'pointless-team';
+const KEY = 'pointless-team-name';
 
-function loadSaved(): { code: string; from: string } {
+function loadName(): string {
   try {
-    const raw = localStorage.getItem(KEY);
-    const v = raw ? (JSON.parse(raw) as Partial<{ code: string; from: string }>) : {};
-    return { code: v.code ?? '', from: v.from ?? '' };
+    return localStorage.getItem(KEY) ?? '';
   } catch {
-    return { code: '', from: '' };
+    return '';
   }
 }
 
-function save(v: { code: string; from: string }) {
+function saveName(v: string) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(v));
+    localStorage.setItem(KEY, v);
   } catch {
     /* private window: just won't remember */
   }
 }
 
-async function call(code: string, method: 'GET' | 'POST' | 'PATCH', body?: unknown) {
+async function call(method: 'GET' | 'POST' | 'PATCH', body?: unknown) {
   const res = await fetch('/api/team', {
     method,
-    headers: { 'Content-Type': 'application/json', 'X-Team-Code': code },
+    headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = (await res.json().catch(() => ({}))) as { error?: string; notes?: Note[]; note?: Note };
-  if (!res.ok) throw Object.assign(new Error(data.error || 'Something went wrong.'), { status: res.status });
+  if (!res.ok) throw new Error(data.error || 'Something went wrong.');
   return data;
 }
 
@@ -68,8 +65,7 @@ function when(iso: string): string {
 }
 
 export default function Team() {
-  const [saved, setSaved] = useState(loadSaved);
-  const [codeInput, setCodeInput] = useState('');
+  const [from, setFrom] = useState(loadName);
   const [notes, setNotes] = useState<Note[] | null>(null);
   const [text, setText] = useState('');
   const [kind, setKind] = useState<Kind>('idea');
@@ -77,53 +73,22 @@ export default function Team() {
   const [err, setErr] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
 
-  const fail = (e: unknown) => {
-    if ((e as { status?: number }).status === 401) {
-      save({ ...loadSaved(), code: '' });
-      setSaved((s) => ({ ...s, code: '' }));
-    }
-    setErr((e as Error).message);
-  };
-
   useEffect(() => {
-    if (!saved.code) return;
     let live = true;
-    call(saved.code, 'GET')
-      .then((d) => {
-        if (!live) return;
-        setNotes(d.notes ?? []);
-        setErr(null);
-      })
-      .catch((e: unknown) => live && fail(e));
+    call('GET')
+      .then((d) => live && setNotes(d.notes ?? []))
+      .catch((e: unknown) => live && setErr((e as Error).message));
     return () => {
       live = false;
     };
-  }, [saved.code]);
-
-  const unlock = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const code = codeInput.trim();
-    if (!code) return;
-    setBusy(true);
-    try {
-      // Check the code before remembering it; the effect then loads the list.
-      await call(code, 'GET');
-      const next = { ...saved, code };
-      save(next);
-      setSaved(next);
-      setErr(null);
-    } catch (e2) {
-      fail(e2);
-    }
-    setBusy(false);
-  };
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!text.trim() || busy) return;
     setBusy(true);
     try {
-      const d = await call(saved.code, 'POST', { text, kind, from: saved.from });
+      const d = await call('POST', { text, kind, from });
       if (d.note) setNotes((n) => [d.note!, ...(n ?? [])]);
       setText('');
       setErr(null);
@@ -136,51 +101,20 @@ export default function Team() {
   const toggle = async (n: Note) => {
     setNotes((all) => all?.map((x) => (x.number === n.number ? { ...x, done: !n.done } : x)) ?? null);
     try {
-      await call(saved.code, 'PATCH', { number: n.number, done: !n.done });
+      await call('PATCH', { number: n.number, done: !n.done });
     } catch (e) {
       setNotes((all) => all?.map((x) => (x.number === n.number ? n : x)) ?? null);
       setErr((e as Error).message);
     }
   };
 
-  const back = (
-    <Link to="/you" className="inline-flex items-center gap-1.5 text-[14px] text-ink-2 hover:text-ink">
-      <ArrowLeft size={16} /> Back
-    </Link>
-  );
-
-  if (!saved.code) {
-    return (
-      <div className="fade-in max-w-md">
-        {back}
-        <h1 className="mt-10 text-[32px] leading-none font-medium tracking-tight">Team notes</h1>
-        <p className="mt-3 text-[15px] text-ink-2">For the people building this app.</p>
-        <form onSubmit={unlock} className="mt-8 flex gap-2">
-          <input
-            value={codeInput}
-            onChange={(e) => setCodeInput(e.target.value)}
-            type="password"
-            autoComplete="off"
-            placeholder="Team code"
-            aria-label="Team code"
-            className="flex-1 h-11 px-4 rounded-full bg-paper-2/70 border border-line focus:border-ink-3 outline-none text-[15px]"
-          />
-          <button type="submit" disabled={busy} className="h-11 px-5 rounded-full bg-ink text-paper text-[14px] font-medium disabled:opacity-50">
-            Open
-          </button>
-        </form>
-        {err && <p className="mt-3 text-[13px] text-ink-2 fade-in">{err}</p>}
-      </div>
-    );
-  }
-
   const open = notes?.filter((n) => !n.done) ?? [];
   const done = notes?.filter((n) => n.done) ?? [];
 
   return (
     <div className="fade-in">
-      {back}
-      <h1 className="mt-6 text-[32px] leading-none font-medium tracking-tight">Team notes</h1>
+      <h1 className="text-[32px] leading-none font-medium tracking-tight">Team</h1>
+      <p className="mt-2 text-[15px] text-ink-2">What should change in the app.</p>
 
       <form onSubmit={submit} className="mt-6 rounded-2xl border border-line bg-paper-2/40 p-3">
         <textarea
@@ -201,11 +135,10 @@ export default function Team() {
             </Chip>
           ))}
           <input
-            value={saved.from}
+            value={from}
             onChange={(e) => {
-              const next = { ...saved, from: e.target.value };
-              setSaved(next);
-              save(next);
+              setFrom(e.target.value);
+              saveName(e.target.value);
             }}
             placeholder="your name"
             aria-label="Your name"
@@ -250,19 +183,6 @@ export default function Team() {
         </>
       )}
 
-      <div className="mt-12 text-[12px] text-ink-3">
-        <button
-          type="button"
-          onClick={() => {
-            save({ ...saved, code: '' });
-            setSaved((s) => ({ ...s, code: '' }));
-            setNotes(null);
-          }}
-          className="hover:text-ink"
-        >
-          lock on this device
-        </button>
-      </div>
     </div>
   );
 }

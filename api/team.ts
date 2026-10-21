@@ -1,10 +1,9 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { timingSafeEqual } from 'node:crypto';
 
 /**
  * Team notes: suggestions from the people building the app, filed as GitHub issues in the app's repo
- * so they land where the work happens. Behind a shared team code; nothing about app users passes through here.
- * Needs TEAM_CODE and GITHUB_TOKEN (fine-grained, Issues read/write on the repo) in the Vercel project env.
+ * so they land where the work happens. Pre-release only: open to anyone with the app, so drop it before launch.
+ * Needs GITHUB_TOKEN (fine-grained, Issues read/write on the repo) in the Vercel project env.
  * GITHUB_REPO defaults to rixon-noxir/pointless.
  *
  * GET              list open + recently done notes
@@ -59,12 +58,6 @@ function send(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body));
 }
 
-function codeMatches(given: string, expected: string): boolean {
-  const a = Buffer.from(given);
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
-
 async function gh(path: string, init: RequestInit = {}): Promise<Response> {
   const repo = process.env.GITHUB_REPO || 'rixon-noxir/pointless';
   return fetch(`https://api.github.com/repos/${repo}${path}`, {
@@ -104,13 +97,11 @@ function toNote(i: GhIssue) {
 }
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
-  if (!process.env.TEAM_CODE || !process.env.GITHUB_TOKEN) return send(res, 503, { error: 'Team notes are not set up on this server.' });
+  if (!process.env.GITHUB_TOKEN) return send(res, 503, { error: 'Team notes are not set up on this server.' });
 
   const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
   if (!allowed(ip)) return send(res, 429, { error: 'Slow down.' });
 
-  const code = req.headers['x-team-code'];
-  if (typeof code !== 'string' || !codeMatches(code, process.env.TEAM_CODE)) return send(res, 401, { error: 'Wrong code.' });
 
   try {
     if (req.method === 'GET') {
