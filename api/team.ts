@@ -1,31 +1,32 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { randomUUID } from 'node:crypto';
+import { del, get, list, put } from '@vercel/blob';
 
 /**
- * Team notes: Colton's suggestions for the app, filed as GitHub issues in the app's repo
- * so they land where the work happens. Pre-release only: open to anyone with the app, so drop it before launch.
- * Needs GITHUB_TOKEN (fine-grained, Issues read/write on the repo) in the Vercel project env.
- * GITHUB_REPO defaults to rixon-noxir/pointless.
+ * Team notes: Colton's suggestions for the app, kept in the project's private Blob store.
+ * Pre-release only: open to anyone with the app, so drop it before launch.
+ * Needs BLOB_READ_WRITE_TOKEN (set by linking the pointless-team store to the project).
  *
- * GET              list open + recently done notes
+ * Each note is one write-once blob at team/notes/<id>.json. "Done" is a separate marker at team/done/<id>,
+ * so a note never gets overwritten and the list never reads a stale cached copy.
+ *
+ * GET                       list notes
  * POST {text, kind}         file a new note
- * PATCH {number, done}      mark done / reopen
+ * PATCH {id, done}          mark done / reopen
  */
 
-const LABEL = 'team-note';
 const KINDS = ['idea', 'bug', 'change'] as const;
 type Kind = (typeof KINDS)[number];
 
-interface GhIssue {
-  number: number;
-  title: string;
-  body: string | null;
-  state: 'open' | 'closed';
-  created_at: string;
-  closed_at: string | null;
-  html_url: string;
-  labels: { name: string }[];
-  pull_request?: unknown;
+interface Stored {
+  id: string;
+  text: string;
+  kind: Kind;
+  createdAt: string;
 }
+
+const NOTES = 'team/notes/';
+const DONE = 'team/done/';
 
 const hits = new Map<string, { n: number; t: number }>();
 function allowed(ip: string): boolean {
@@ -58,53 +59,40 @@ function send(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body));
 }
 
-async function gh(path: string, init: RequestInit = {}): Promise<Response> {
-  const repo = process.env.GITHUB_REPO || 'rixon-noxir/pointless';
-  return fetch(`https://api.github.com/repos/${repo}${path}`, {
-    ...init,
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-      'X-GitHub-Api-Version': '2022-11-28',
-      'Content-Type': 'application/json',
-      'User-Agent': 'pointless-team-notes',
-    },
-  });
+async function listAll(prefix: string) {
+  const out: { pathname: string; uploadedAt: Date }[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await list({ prefix, cursor, limit: 1000 });
+    out.push(...page.blobs);
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
+  return out;
 }
 
-/** First line, trimmed to something that reads well in an issue list. */
-function titleFrom(text: string): string {
-  const first = text.split('\n').find((l) => l.trim())?.trim() ?? 'Note';
-  return first.length > 72 ? `${first.slice(0, 70).trimEnd()}…` : first;
+async function readNote(pathname: string): Promise<Stored | null> {
+  const r = await get(pathname, { access: 'private' });
+  if (!r || r.statusCode !== 200) return null;
+  return JSON.parse(await new Response(r.stream).text()) as Stored;
 }
 
-function toNote(i: GhIssue) {
-  const kind = (i.labels.map((l) => l.name).find((n) => (KINDS as readonly string[]).includes(n)) ?? 'idea') as Kind;
-  const text = (i.body ?? '').trim();
-  return {
-    number: i.number,
-    title: i.title,
-    text,
-    kind,
-    done: i.state === 'closed',
-    createdAt: i.created_at,
-    closedAt: i.closed_at,
-    url: i.html_url,
-  };
-}
+const validId = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f-]{36}$/.test(v);
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
-  if (!process.env.GITHUB_TOKEN) return send(res, 503, { error: 'Team notes are not set up on this server.' });
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return send(res, 503, { error: 'Team notes are not set up on this server.' });
 
   const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
   if (!allowed(ip)) return send(res, 429, { error: 'Slow down.' });
 
   try {
     if (req.method === 'GET') {
-      const r = await gh(`/issues?labels=${LABEL}&state=all&per_page=100&sort=created&direction=desc`);
-      if (!r.ok) return send(res, 502, { error: 'Could not reach GitHub.' });
-      const issues = ((await r.json()) as GhIssue[]).filter((i) => !i.pull_request);
-      return send(res, 200, { notes: issues.map(toNote) });
+      const [notes, done] = await Promise.all([listAll(NOTES), listAll(DONE)]);
+      const closed = new Map(done.map((b) => [b.pathname.slice(DONE.length), b.uploadedAt.toISOString()]));
+      const read = (await Promise.all(notes.map((b) => readNote(b.pathname)))).filter((n): n is Stored => !!n);
+      read.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      return send(res, 200, {
+        notes: read.map((n) => ({ ...n, done: closed.has(n.id), closedAt: closed.get(n.id) ?? null })),
+      });
     }
 
     let parsed: Record<string, unknown>;
@@ -118,32 +106,23 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       const text = typeof parsed.text === 'string' ? parsed.text.trim().slice(0, 8000) : '';
       if (!text) return send(res, 400, { error: 'Write something first.' });
       const kind: Kind = (KINDS as readonly unknown[]).includes(parsed.kind) ? (parsed.kind as Kind) : 'idea';
-      const r = await gh('/issues', {
-        method: 'POST',
-        body: JSON.stringify({
-          title: titleFrom(text),
-          body: text,
-          labels: [LABEL, kind],
-        }),
+      const note: Stored = { id: randomUUID(), text, kind, createdAt: new Date().toISOString() };
+      await put(`${NOTES}${note.id}.json`, JSON.stringify(note), {
+        access: 'private',
+        contentType: 'application/json',
+        addRandomSuffix: false,
       });
-      if (!r.ok) return send(res, 502, { error: 'Could not save to GitHub.' });
-      return send(res, 201, { note: toNote((await r.json()) as GhIssue) });
+      return send(res, 201, { note: { ...note, done: false, closedAt: null } });
     }
 
     if (req.method === 'PATCH') {
-      const number = typeof parsed.number === 'number' && Number.isInteger(parsed.number) ? parsed.number : 0;
-      if (number <= 0) return send(res, 400, { error: 'Bad request.' });
-      // Only team notes can be touched from here, never other issues in the repo.
-      const cur = await gh(`/issues/${number}`);
-      if (!cur.ok) return send(res, 404, { error: 'Not found.' });
-      const issue = (await cur.json()) as GhIssue;
-      if (!issue.labels.some((l) => l.name === LABEL)) return send(res, 404, { error: 'Not found.' });
-      const r = await gh(`/issues/${number}`, {
-        method: 'PATCH',
-        body: JSON.stringify(parsed.done ? { state: 'closed', state_reason: 'completed' } : { state: 'open' }),
-      });
-      if (!r.ok) return send(res, 502, { error: 'Could not update GitHub.' });
-      return send(res, 200, { note: toNote((await r.json()) as GhIssue) });
+      if (!validId(parsed.id)) return send(res, 400, { error: 'Bad request.' });
+      if (parsed.done) {
+        await put(`${DONE}${parsed.id}`, '1', { access: 'private', addRandomSuffix: false, allowOverwrite: true });
+      } else {
+        await del(`${DONE}${parsed.id}`).catch(() => undefined);
+      }
+      return send(res, 200, { ok: true });
     }
 
     return send(res, 405, { error: 'Method not allowed.' });

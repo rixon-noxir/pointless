@@ -3,20 +3,18 @@ import { Check, RotateCcw, Send } from 'lucide-react';
 import { Chip, SectionTitle } from '@/components/TypeBits';
 
 /**
- * Team: Colton's notes on what to change in the app, filed as issues in the app's repo.
+ * Team: Colton's notes on what to change in the app, kept in the project's Blob store.
  * Pre-release only. To drop it: delete this page, api/team.ts, its route in App.tsx and its entry in Shell.tsx.
  */
 
 type Kind = 'idea' | 'bug' | 'change';
 interface Note {
-  number: number;
-  title: string;
+  id: string;
   text: string;
   kind: Kind;
   done: boolean;
   createdAt: string;
   closedAt: string | null;
-  url: string;
 }
 
 const KINDS: { v: Kind; label: string }[] = [
@@ -79,11 +77,11 @@ export default function Team() {
   };
 
   const toggle = async (n: Note) => {
-    setNotes((all) => all?.map((x) => (x.number === n.number ? { ...x, done: !n.done } : x)) ?? null);
+    setNotes((all) => all?.map((x) => (x.id === n.id ? { ...x, done: !n.done } : x)) ?? null);
     try {
-      await call('PATCH', { number: n.number, done: !n.done });
+      await call('PATCH', { id: n.id, done: !n.done });
     } catch (e) {
-      setNotes((all) => all?.map((x) => (x.number === n.number ? n : x)) ?? null);
+      setNotes((all) => all?.map((x) => (x.id === n.id ? n : x)) ?? null);
       setErr((e as Error).message);
     }
   };
@@ -133,7 +131,7 @@ export default function Team() {
       ) : (
         <ul className="space-y-1">
           {open.map((n) => (
-            <NoteRow key={n.number} n={n} onToggle={() => void toggle(n)} />
+            <NoteRow key={n.id} n={n} onToggle={() => void toggle(n)} />
           ))}
         </ul>
       )}
@@ -146,7 +144,7 @@ export default function Team() {
           {showDone && (
             <ul className="space-y-1">
               {done.map((n) => (
-                <NoteRow key={n.number} n={n} onToggle={() => void toggle(n)} />
+                <NoteRow key={n.id} n={n} onToggle={() => void toggle(n)} />
               ))}
             </ul>
           )}
@@ -171,13 +169,9 @@ function NoteRow({ n, onToggle }: { n: Note; onToggle: () => void }) {
         {n.done ? <RotateCcw size={12} /> : <Check size={13} />}
       </button>
       <div className="min-w-0 flex-1">
-        <p className={`text-[15px] leading-snug whitespace-pre-wrap break-words ${n.done ? 'text-ink-3 line-through decoration-ink-3/50' : ''}`}>{n.text || n.title}</p>
+        <p className={`text-[15px] leading-snug whitespace-pre-wrap break-words ${n.done ? 'text-ink-3 line-through decoration-ink-3/50' : ''}`}>{n.text}</p>
         <p className="mt-1 text-[12px] text-ink-3">
-          {KINDS.find((k) => k.v === n.kind)?.label}
-          {' · '}{when(n.createdAt)} ·{' '}
-          <a href={n.url} target="_blank" rel="noopener noreferrer" className="hover:text-ink">
-            #{n.number} ↗
-          </a>
+          {KINDS.find((k) => k.v === n.kind)?.label} · {when(n.createdAt)}
         </p>
       </div>
     </li>
